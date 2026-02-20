@@ -2,9 +2,10 @@ import streamlit as st
 import requests
 import pandas as pd
 import pydeck as pdk
+import plotly.graph_objects as go
 
 st.set_page_config(layout="wide")
-st.title("🌍 Global Temperature Heatmap Dashboard")
+st.title("🌍 Global Weather Dashboard (Plotly Edition)")
 
 # =========================
 # Wereldsteden
@@ -24,7 +25,7 @@ cities = {
 }
 
 # =========================
-# Temperatuurdata ophalen
+# TEMPERATURE HEATMAP
 # =========================
 data_points = []
 
@@ -47,16 +48,9 @@ for city, (lat, lon) in cities.items():
 
 df = pd.DataFrame(data_points)
 
-# =========================
-# HEATMAP
-# =========================
 st.subheader("🌡️ Wereld Temperatuur Heatmap")
 
-view_state = pdk.ViewState(
-    latitude=20,
-    longitude=0,
-    zoom=1.5,
-)
+view_state = pdk.ViewState(latitude=20, longitude=0, zoom=1.5)
 
 heatmap = pdk.Layer(
     "HeatmapLayer",
@@ -75,12 +69,11 @@ deck = pdk.Deck(
 st.pydeck_chart(deck)
 
 # =========================
-# Stad selecteren
+# Stad selectie
 # =========================
 st.subheader("📍 Bekijk details per stad")
 
 selected_city = st.selectbox("Kies een stad:", list(cities.keys()))
-
 lat, lon = cities[selected_city]
 
 weather_url = (
@@ -103,15 +96,49 @@ col1.metric("Temperatuur (°C)", weather_data["current_weather"]["temperature"])
 col2.metric("Wind (km/h)", weather_data["current_weather"]["windspeed"])
 
 # =========================
-# Forecast
+# Plotly Forecast
 # =========================
-st.subheader("📅 7-daagse voorspelling")
+st.subheader("📈 7-daagse Forecast (Interactief)")
 
-daily_df = pd.DataFrame({
-    "Datum": weather_data["daily"]["time"],
-    "Max Temp": weather_data["daily"]["temperature_2m_max"],
-    "Min Temp": weather_data["daily"]["temperature_2m_min"],
-    "Neerslag (mm)": weather_data["daily"]["precipitation_sum"]
-})
+dates = weather_data["daily"]["time"]
+max_temp = weather_data["daily"]["temperature_2m_max"]
+min_temp = weather_data["daily"]["temperature_2m_min"]
+rain = weather_data["daily"]["precipitation_sum"]
 
-st.line_chart(daily_df.set_index("Datum"))
+fig = go.Figure()
+
+fig.add_trace(go.Scatter(
+    x=dates,
+    y=max_temp,
+    mode='lines+markers',
+    name='Max Temp',
+))
+
+fig.add_trace(go.Scatter(
+    x=dates,
+    y=min_temp,
+    mode='lines+markers',
+    name='Min Temp',
+))
+
+fig.add_trace(go.Bar(
+    x=dates,
+    y=rain,
+    name='Neerslag (mm)',
+    yaxis='y2',
+    opacity=0.4
+))
+
+fig.update_layout(
+    xaxis_title="Datum",
+    yaxis_title="Temperatuur (°C)",
+    yaxis2=dict(
+        title="Neerslag (mm)",
+        overlaying='y',
+        side='right'
+    ),
+    hovermode="x unified",
+    legend=dict(x=0.01, y=0.99)
+)
+
+st.plotly_chart(fig, use_container_width=True)
