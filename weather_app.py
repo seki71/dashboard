@@ -3,6 +3,7 @@ import requests
 import pandas as pd
 import pydeck as pdk
 import plotly.graph_objects as go
+import numpy as np
 
 st.set_page_config(layout="wide")
 st.title("🌍 Global Weather Dashboard (50 Cities Edition)")
@@ -232,8 +233,6 @@ st.metric("📈 Correlatie (Temp vs Verbruik)", round(correlation, 3))
 # ---------------------------
 # Scatterplot + Regressielijn
 # ---------------------------
-
-import numpy as np
 
 # Lineaire regressie berekenen
 x = merged["temp"]
