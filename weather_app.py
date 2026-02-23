@@ -109,7 +109,7 @@ def get_temperature_data():
 df = get_temperature_data()
 
 # =========================
-# BETERE TEMPERATUUR KAART
+# TEMPERATUUR KAART
 # =========================
 st.subheader("🌡️ Wereld Temperatuur Kaart")
 
