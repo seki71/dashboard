@@ -169,7 +169,7 @@ st.header("🔬 Onderzoek: Temperatuur vs Elektriciteitsverbruik (Nederland)")
 st.write("Onderzoeksvraag: Heeft temperatuur invloed op elektriciteitsverbruik in Nederland?")
 
 # ---------------------------
-# 1️⃣ Historische temperatuur NL (Amsterdam 2022)
+# Historische temperatuur NL (Amsterdam 2022)
 # ---------------------------
 @st.cache_data(ttl=3600)
 def get_monthly_temperature():
@@ -210,13 +210,13 @@ def get_cbs_energy():
     return pd.DataFrame(data)
 
 # ---------------------------
-# 3️⃣ Data ophalen
+# Data ophalen
 # ---------------------------
 monthly_temp = get_monthly_temperature()
 monthly_energy = get_cbs_energy()
 
 # ---------------------------
-# 4️⃣ Merge
+# Merge
 # ---------------------------
 merged = pd.merge(monthly_temp, monthly_energy, on="month")
 
@@ -224,26 +224,49 @@ st.subheader("📊 Gecombineerde Data")
 st.dataframe(merged)
 
 # ---------------------------
-# 5️⃣ Correlatie
+# Correlatie
 # ---------------------------
 correlation = merged["temp"].corr(merged["electricity"])
 st.metric("📈 Correlatie (Temp vs Verbruik)", round(correlation, 3))
 
 # ---------------------------
-# 6️⃣ Scatterplot
+# Scatterplot + Regressielijn
 # ---------------------------
+
+import numpy as np
+
+# Lineaire regressie berekenen
+x = merged["temp"]
+y = merged["electricity"]
+
+slope, intercept = np.polyfit(x, y, 1)
+regression_line = slope * x + intercept
+
+# R² berekenen
+correlation = x.corr(y)
+r_squared = correlation ** 2
+
 fig = go.Figure()
 
+# Punten
 fig.add_trace(go.Scatter(
-    x=merged["temp"],
-    y=merged["electricity"],
+    x=x,
+    y=y,
     mode='markers',
     marker=dict(size=10),
     name="Maanden"
 ))
 
+# Regressielijn
+fig.add_trace(go.Scatter(
+    x=x,
+    y=regression_line,
+    mode='lines',
+    name="Regressielijn"
+))
+
 fig.update_layout(
-    title="Temperatuur vs Elektriciteitsverbruik",
+    title=f"Temperatuur vs Elektriciteitsverbruik (R² = {r_squared:.3f})",
     xaxis_title="Gemiddelde Maandtemperatuur (°C)",
     yaxis_title="Elektriciteitsverbruik (GWh)",
 )
