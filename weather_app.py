@@ -109,27 +109,42 @@ def get_temperature_data():
 df = get_temperature_data()
 
 # =========================
-# HEATMAP
+# BETERE TEMPERATUUR KAART
 # =========================
-st.subheader("🌡️ Wereld Temperatuur Heatmap")
+st.subheader("🌡️ Wereld Temperatuur Kaart")
+
+# Temperatuur normaliseren voor kleur
+min_temp = df["temp"].min()
+max_temp = df["temp"].max()
+
+def temp_to_color(temp):
+    ratio = (temp - min_temp) / (max_temp - min_temp + 1e-6)
+    red = int(255 * ratio)
+    blue = int(255 * (1 - ratio))
+    return [red, 0, blue, 200]
+
+df["color"] = df["temp"].apply(temp_to_color)
 
 view_state = pdk.ViewState(latitude=20, longitude=0, zoom=1.5)
 
-heatmap = pdk.Layer(
-    "HeatmapLayer",
+layer = pdk.Layer(
+    "ScatterplotLayer",
     data=df,
     get_position='[lon, lat]',
-    get_weight="temp",
-    radiusPixels=60,
+    get_fill_color="color",
+    get_radius=200000,
+    pickable=True,
 )
 
 deck = pdk.Deck(
     map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
     initial_view_state=view_state,
-    layers=[heatmap],
+    layers=[layer],
+    tooltip={"text": "{city}\nTemp: {temp}°C"}
 )
 
 st.pydeck_chart(deck)
+
 
 # =========================
 # Stad selectie
