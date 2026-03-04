@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import pandas as pd
-import pydeck as pdk
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
@@ -9,7 +8,7 @@ import numpy as np
 st.set_page_config(layout="wide")
 
 # ======================================================
-# 🎨 PREMIUM STYLING
+# 🎨 STYLING
 # ======================================================
 
 st.markdown("""
@@ -23,48 +22,54 @@ h1, h2, h3 { color: #F9FAFB; }
     border-radius: 12px;
     border: 1px solid #374151;
 }
-.block-container { padding-top: 2rem; }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🌍 Global Weather & Energy Intelligence Dashboard")
+st.title("🌍 Global Weather & Energy Analytics Dashboard")
 
 # ======================================================
-# 🎛 SIDEBAR
+# SIDEBAR
 # ======================================================
 
 st.sidebar.markdown("## ⚙️ Controls")
 
 module = st.sidebar.radio(
     "Module",
-    ["🌍 Wereldkaart", "📍 Stad Analyse", "🔬 NL Energie Onderzoek"]
+    ["🌍 Wereldkaart", "📍 Weather Forecast", "🔬 NL Energie Onderzoek"]
 )
 
 selected_year = st.sidebar.selectbox(
-    "Jaar",
+    "Jaar (NL onderzoek)",
     [2019, 2020, 2021, 2022, 2023]
 )
 
-if st.sidebar.button("🔄 Refresh Data"):
-    st.cache_data.clear()
+st.sidebar.markdown("### 🔬 Onderzoek Grafieken")
+
+show_regression = st.sidebar.checkbox("Toon regressie", True)
+show_trend = st.sidebar.checkbox("Toon maandelijkse trend", True)
+show_corr = st.sidebar.checkbox("Toon correlatiematrix", True)
+show_residuals = st.sidebar.checkbox("Toon residual plot", False)
+show_season = st.sidebar.checkbox("Toon seizoensanalyse", False)
+show_year_compare = st.sidebar.checkbox("Toon jaarvergelijking", True)
 
 # ======================================================
-# 🌍 WERELDKAART (ANIMATED STYLE)
+# 🌍 WERELDKAART
 # ======================================================
 
 if module == "🌍 Wereldkaart":
 
+    st.header("🌍 Wereld Temperatuur Analyse")
+
     cities = {
-        "Amsterdam": (52.37,4.90),
-        "London": (51.50,-0.12),
-        "Paris": (48.85,2.35),
-        "Berlin": (52.52,13.40),
-        "New York": (40.71,-74.00),
-        "Toronto": (43.65,-79.38),
-        "Tokyo": (35.68,139.69),
-        "Sydney": (-33.86,151.21),
-        "Dubai": (25.20,55.27),
-        "Singapore": (1.29,103.85)
+        "Amsterdam": (52.37,4.90,"Europe"),
+        "London": (51.50,-0.12,"Europe"),
+        "Paris": (48.85,2.35,"Europe"),
+        "Berlin": (52.52,13.40,"Europe"),
+        "New York": (40.71,-74.00,"North America"),
+        "Tokyo": (35.68,139.69,"Asia"),
+        "Sydney": (-33.86,151.21,"Oceania"),
+        "Dubai": (25.20,55.27,"Asia"),
+        "Cape Town": (-33.92,18.42,"Africa"),
     }
 
     @st.cache_data(ttl=3600)
@@ -78,20 +83,21 @@ if module == "🌍 Wereldkaart":
         for i, city in enumerate(cities.keys()):
             data.append({
                 "city": city,
+                "continent": list(cities.values())[i][2],
                 "lat": list(cities.values())[i][0],
                 "lon": list(cities.values())[i][1],
-                "temp": response[i]["current_weather"]["temperature"]
+                "temp": response[i]["current_weather"]["temperature"],
+                "wind": response[i]["current_weather"]["windspeed"]
             })
         return pd.DataFrame(data)
 
     df = get_world()
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("Aantal steden", len(df))
-    col2.metric("Gemiddelde temp", f"{df['temp'].mean():.1f}°C")
-    col3.metric("Max temp", f"{df['temp'].max():.1f}°C")
+    col1.metric("Gem. temp", f"{df['temp'].mean():.1f} °C")
+    col2.metric("Warmste stad", df.sort_values("temp",ascending=False).iloc[0]["city"])
+    col3.metric("Gem. wind", f"{df['wind'].mean():.1f} km/h")
 
-    # 🌍 Animated Scatter Map
     fig_map = px.scatter_geo(
         df,
         lat="lat",
@@ -99,25 +105,20 @@ if module == "🌍 Wereldkaart":
         color="temp",
         size="temp",
         hover_name="city",
+        projection="natural earth",
         color_continuous_scale="Turbo",
-        projection="natural earth"
-    )
-
-    fig_map.update_layout(
-        template="plotly_dark",
-        title="Live Wereldtemperaturen",
-        transition_duration=800
+        template="plotly_dark"
     )
 
     st.plotly_chart(fig_map, use_container_width=True)
 
 # ======================================================
-# 📍 STAD ANALYSE (SMOOTH ANIMATED)
+# 📍 WEATHER FORECAST + VERGELIJKING
 # ======================================================
 
-if module == "📍 Stad Analyse":
+if module == "📍 Weather Forecast":
 
-    city = st.selectbox("Selecteer stad", ["Amsterdam","London","New York","Tokyo","Sydney"])
+    st.header("📍 7-daagse Forecast + Vergelijking")
 
     coords = {
         "Amsterdam": (52.37,4.90),
@@ -127,135 +128,238 @@ if module == "📍 Stad Analyse":
         "Sydney": (-33.86,151.21)
     }
 
-    lat, lon = coords[city]
+    col1, col2 = st.columns(2)
+    city1 = col1.selectbox("Stad 1", list(coords.keys()))
+    city2 = col2.selectbox("Stad 2", list(coords.keys()), index=1)
 
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&daily=temperature_2m_max,temperature_2m_min&timezone=auto"
-    data = requests.get(url).json()
+    def get_forecast(city):
+        lat, lon = coords[city]
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto"
+        data = requests.get(url).json()
+        return pd.DataFrame({
+            "date": data["daily"]["time"],
+            "max_temp": data["daily"]["temperature_2m_max"],
+            "min_temp": data["daily"]["temperature_2m_min"],
+            "rain": data["daily"]["precipitation_sum"]
+        })
 
-    df_city = pd.DataFrame({
-        "date": data["daily"]["time"],
-        "max": data["daily"]["temperature_2m_max"],
-        "min": data["daily"]["temperature_2m_min"]
-    })
+    df1 = get_forecast(city1)
+    df2 = get_forecast(city2)
 
-    fig = px.line(
-        df_city,
-        x="date",
-        y=["max","min"],
-        template="plotly_dark",
-        title=f"7-daagse Forecast – {city}"
-    )
+    fig_compare = go.Figure()
+    fig_compare.add_trace(go.Scatter(x=df1["date"], y=df1["max_temp"], mode="lines+markers", name=f"{city1} Max"))
+    fig_compare.add_trace(go.Scatter(x=df2["date"], y=df2["max_temp"], mode="lines+markers", name=f"{city2} Max"))
+    fig_compare.update_layout(template="plotly_dark", title="Max temperatuur vergelijking")
 
-    fig.update_layout(transition_duration=800)
-
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig_compare, use_container_width=True)
 
 # ======================================================
-# 🔬 NL ENERGIE ONDERZOEK (ANIMATED ANALYTICS)
+# 🔬 NL ENERGIE ONDERZOEK
 # ======================================================
 
 if module == "🔬 NL Energie Onderzoek":
 
-    st.header("🔬 Temperatuur vs Elektriciteitsverbruik NL")
+    st.header("🔬 Temperatuur vs Elektriciteitsverbruik (Nederland)")
 
-    nl_cities = {
-        "Amsterdam": (52.37,4.90),
-        "Rotterdam": (51.92,4.48),
-        "Utrecht": (52.09,5.12),
-        "Groningen": (53.22,6.57),
-        "Eindhoven": (51.44,5.48),
-    }
-
-    years = [2019,2020,2021,2022,2023]
+    # =============================
+    # DATA OPHALEN
+    # =============================
 
     @st.cache_data(ttl=86400)
     def get_temp():
-        lats = ",".join([str(v[0]) for v in nl_cities.values()])
-        lons = ",".join([str(v[1]) for v in nl_cities.values()])
-        url = f"https://archive-api.open-meteo.com/v1/archive?latitude={lats}&longitude={lons}&start_date=2019-01-01&end_date=2023-12-31&daily=temperature_2m_mean"
+        url = (
+            "https://archive-api.open-meteo.com/v1/archive?"
+            "latitude=52.37&longitude=4.90"
+            "&start_date=2019-01-01"
+            "&end_date=2023-12-31"
+            "&daily=temperature_2m_mean"
+        )
         response = requests.get(url).json()
 
-        city_data = []
-        for i in range(len(nl_cities)):
-            df_temp = pd.DataFrame({
-                "date": response[i]["daily"]["time"],
-                "temp": response[i]["daily"]["temperature_2m_mean"]
-            })
-            df_temp["date"] = pd.to_datetime(df_temp["date"])
-            df_temp["year"] = df_temp["date"].dt.year
-            df_temp["month"] = df_temp["date"].dt.month
-            monthly = df_temp.groupby(["year","month"])["temp"].mean().reset_index()
-            city_data.append(monthly)
+        df = pd.DataFrame({
+            "date": response["daily"]["time"],
+            "temp": response["daily"]["temperature_2m_mean"]
+        })
 
-        combined = pd.concat(city_data)
-        national = combined.groupby(["year","month"])["temp"].mean().reset_index()
-        return national
+        df["date"] = pd.to_datetime(df["date"])
+        df["year"] = df["date"].dt.year
+        df["month"] = df["date"].dt.month
+
+        monthly = df.groupby(["year", "month"])["temp"].mean().reset_index()
+        return monthly
 
     @st.cache_data(ttl=86400)
     def get_cbs():
         url = "https://opendata.cbs.nl/ODataApi/odata/84575NED/TypedDataSet"
         df = pd.DataFrame(requests.get(url).json()["value"])
+
         df = df[df["Perioden"].str.contains("2019|2020|2021|2022|2023")]
         df = df[df["Perioden"].str.contains("M")]
-        df_energy = df[["Perioden","NettoVerbruikBerekend_30"]]
-        df_energy.columns = ["period","electricity"]
+
+        df_energy = df[["Perioden", "NettoVerbruikBerekend_30"]]
+        df_energy.columns = ["period", "electricity"]
+
         df_energy["year"] = df_energy["period"].str[:4].astype(int)
         df_energy["month"] = df_energy["period"].str.extract(r"M(\d+)").astype(int)
-        return df_energy[["year","month","electricity"]]
+        df_energy["electricity"] = df_energy["electricity"] / 1000  # naar GWh
 
-    with st.spinner("Data laden..."):
-        temp_df = get_temp()
-        energy_df = get_cbs()
+        return df_energy[["year", "month", "electricity"]]
 
-    merged = pd.merge(temp_df, energy_df, on=["year","month"])
-    df_year = merged[merged["year"]==selected_year]
+    temp_df = get_temp()
+    energy_df = get_cbs()
+
+    merged = pd.merge(temp_df, energy_df, on=["year", "month"])
+    df_year = merged[merged["year"] == selected_year]
 
     x = df_year["temp"]
     y = df_year["electricity"]
 
-    slope, intercept = np.polyfit(x,y,1)
-    regression_line = slope*x + intercept
-    r2 = x.corr(y)**2
+    slope, intercept = np.polyfit(x, y, 1)
+    regression_line = slope * x + intercept
+    r2 = x.corr(y) ** 2
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Gemiddelde Temp", f"{x.mean():.2f}°C")
-    col2.metric("Gemiddeld Verbruik", f"{y.mean():,.0f}")
-    col3.metric("R²", f"{r2:.3f}")
+    # =============================
+    # SWITCH (bovenin onderzoek)
+    # =============================
 
-    fig_reg = go.Figure()
-    fig_reg.add_trace(go.Scatter(x=x,y=y,mode="markers",name="Maanden"))
-    fig_reg.add_trace(go.Scatter(x=x,y=regression_line,mode="lines",name="Regressie"))
-
-    fig_reg.update_layout(
-        template="plotly_dark",
-        title=f"Regressie Analyse ({selected_year})",
-        xaxis_title="Gemiddelde maandtemperatuur (°C)",
-        yaxis_title="Elektriciteitsverbruik",
-        transition_duration=800
+    view = st.radio(
+        "📊 Kies analyse:",
+        [
+            "📈 Regressie",
+            "📊 Maandelijkse Trend",
+            "🔥 Correlatiematrix",
+            "📉 Residual Plot",
+            "📅 Jaarvergelijking"
+        ],
+        horizontal=True
     )
 
-    st.plotly_chart(fig_reg, use_container_width=True)
+    st.markdown("---")
 
-    # Animated Trend
-    fig_trend = px.line(
-        merged,
-        x="month",
-        y="electricity",
-        color="year",
-        template="plotly_dark",
-        title="Trend Elektriciteitsverbruik 2019-2023"
-    )
+    # =============================
+    # GRAFIEK LOGICA
+    # =============================
 
-    fig_trend.update_layout(transition_duration=800)
+    if view == "📈 Regressie":
 
-    st.plotly_chart(fig_trend, use_container_width=True)
+        fig = go.Figure()
 
+        fig.add_trace(go.Scatter(
+            x=x,
+            y=y,
+            mode="markers",
+            name="Maanden"
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=x,
+            y=regression_line,
+            mode="lines",
+            name=f"Regressielijn (R²={r2:.2f})"
+        ))
+
+        fig.update_layout(
+            template="plotly_dark",
+            xaxis_title="Gemiddelde maandtemperatuur (°C)",
+            yaxis_title="Elektriciteitsverbruik (GWh)"
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    elif view == "📊 Maandelijkse Trend":
+
+        fig = go.Figure()
+
+        fig.add_trace(go.Scatter(
+            x=df_year["month"],
+            y=df_year["temp"],
+            mode="lines+markers",
+            name="Temperatuur (°C)"
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=df_year["month"],
+            y=df_year["electricity"],
+            mode="lines+markers",
+            name="Elektriciteit (GWh)",
+            yaxis="y2"
+        ))
+
+        fig.update_layout(
+            template="plotly_dark",
+            xaxis_title="Maand (1=Jan, 12=Dec)",
+            yaxis_title="Temperatuur (°C)",
+            yaxis2=dict(
+                title="Elektriciteitsverbruik (GWh)",
+                overlaying="y",
+                side="right"
+            )
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    elif view == "🔥 Correlatiematrix":
+
+        corr = df_year[["temp", "electricity"]].corr()
+
+        fig = go.Figure(data=go.Heatmap(
+            z=corr.values,
+            x=corr.columns,
+            y=corr.columns,
+            colorscale="Turbo"
+        ))
+
+        fig.update_layout(template="plotly_dark")
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    elif view == "📉 Residual Plot":
+
+        residuals = y - regression_line
+
+        fig = go.Figure()
+
+        fig.add_trace(go.Scatter(
+            x=x,
+            y=residuals,
+            mode="markers",
+            name="Residuals"
+        ))
+
+        fig.update_layout(
+            template="plotly_dark",
+            xaxis_title="Temperatuur (°C)",
+            yaxis_title="Residual (model fout)"
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    elif view == "📅 Jaarvergelijking":
+
+        fig = px.line(
+            merged,
+            x="month",
+            y="electricity",
+            color="year",
+            template="plotly_dark",
+            title="Elektriciteitsverbruik per maand (2019-2023)"
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    # =============================
+    # AUTOMATISCHE CONCLUSIE
+    # =============================
+
+    st.markdown("---")
     st.subheader("🧠 Automatische Conclusie")
 
     direction = "negatieve" if slope < 0 else "positieve"
 
     st.write(f"""
-Er is een **{direction} relatie** tussen temperatuur en elektriciteitsverbruik.
-R² = **{r2:.2f}**, wat betekent dat ongeveer **{r2*100:.1f}%**
-van de variatie verklaard wordt door temperatuur.
+In {selected_year} zien we een **{direction} relatie** tussen temperatuur en elektriciteitsverbruik.
+
+R² = **{r2:.2f}**
+
+→ Ongeveer **{r2*100:.1f}%** van de variatie in elektriciteitsverbruik wordt verklaard door temperatuur.
 """)
