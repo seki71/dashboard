@@ -26,8 +26,6 @@ h1, h2, h3 { color: #F9FAFB; }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🌍 Global Weather & Energy Analytics Dashboard")
-
 # ======================================================
 # SIDEBAR
 # ======================================================
