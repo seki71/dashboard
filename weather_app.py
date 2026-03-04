@@ -5,6 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 
+
 st.set_page_config(layout="wide")
 
 # ======================================================
@@ -43,8 +44,11 @@ selected_year = st.sidebar.selectbox(
     [2019, 2020, 2021, 2022, 2023]
 )
 
+if st.sidebar.button("🔄 Refresh Wereldkaart"):
+    st.cache_data.clear()
+
 # ======================================================
-# 🌍 WERELDKAART + EXTRA GRAFIEKEN
+# 🌍 WERELDKAART
 # ======================================================
 
 if module == "🌍 Wereldkaart":
@@ -53,14 +57,20 @@ if module == "🌍 Wereldkaart":
 
     cities = {
         "Amsterdam": (52.37,4.90,"Europe"),
+        "Rotterdam": (51.92,4.48,"Europe"),
         "London": (51.50,-0.12,"Europe"),
         "Paris": (48.85,2.35,"Europe"),
         "Berlin": (52.52,13.40,"Europe"),
+        "Madrid": (40.42,-3.70,"Europe"),
         "New York": (40.71,-74.00,"North America"),
+        "Los Angeles": (34.05,-118.24,"North America"),
+        "Toronto": (43.65,-79.38,"North America"),
+        "Rio de Janeiro": (-22.90,-43.20,"South America"),
         "Tokyo": (35.68,139.69,"Asia"),
-        "Sydney": (-33.86,151.21,"Oceania"),
+        "Singapore": (1.29,103.85,"Asia"),
         "Dubai": (25.20,55.27,"Asia"),
-        "Cape Town": (-33.92,18.42,"Africa"),
+        "Sydney": (-33.86,151.21,"Oceania"),
+        "Cape Town": (-33.92,18.42,"Africa")
     }
 
     @st.cache_data(ttl=3600)
@@ -90,13 +100,16 @@ if module == "🌍 Wereldkaart":
     col2.metric("Warmste stad", df.sort_values("temp",ascending=False).iloc[0]["city"])
     col3.metric("Gem. Wind", f"{df['wind'].mean():.1f} km/h")
 
+    # Fix negatieve size
+    df["size_temp"] = df["temp"].abs() + 5
+
     # Wereldkaart
     fig_map = px.scatter_geo(
         df,
         lat="lat",
         lon="lon",
         color="temp",
-        size="temp",
+        size="size_temp",
         hover_name="city",
         projection="natural earth",
         color_continuous_scale="Turbo",
@@ -127,19 +140,6 @@ if module == "🌍 Wereldkaart":
             title="Wind ranking"
         )
         st.plotly_chart(fig_wind, use_container_width=True)
-
-    st.subheader("🌡️ Temperatuur vs Wind")
-
-    fig_scatter = px.scatter(
-        df,
-        x="temp",
-        y="wind",
-        text="city",
-        template="plotly_dark"
-    )
-
-    st.plotly_chart(fig_scatter, use_container_width=True)
-
 # ======================================================
 # 📍 WEATHER FORECAST + VERGELIJKING + 1 STAD ANALYSE
 # ======================================================
