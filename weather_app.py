@@ -43,17 +43,8 @@ selected_year = st.sidebar.selectbox(
     [2019, 2020, 2021, 2022, 2023]
 )
 
-st.sidebar.markdown("### 🔬 Onderzoek Grafieken")
-
-show_regression = st.sidebar.checkbox("Toon regressie", True)
-show_trend = st.sidebar.checkbox("Toon maandelijkse trend", True)
-show_corr = st.sidebar.checkbox("Toon correlatiematrix", True)
-show_residuals = st.sidebar.checkbox("Toon residual plot", False)
-show_season = st.sidebar.checkbox("Toon seizoensanalyse", False)
-show_year_compare = st.sidebar.checkbox("Toon jaarvergelijking", True)
-
 # ======================================================
-# 🌍 WERELDKAART
+# 🌍 WERELDKAART + EXTRA GRAFIEKEN
 # ======================================================
 
 if module == "🌍 Wereldkaart":
@@ -93,11 +84,13 @@ if module == "🌍 Wereldkaart":
 
     df = get_world()
 
+    # KPI
     col1, col2, col3 = st.columns(3)
-    col1.metric("Gem. temp", f"{df['temp'].mean():.1f} °C")
+    col1.metric("Gem. Temp", f"{df['temp'].mean():.1f} °C")
     col2.metric("Warmste stad", df.sort_values("temp",ascending=False).iloc[0]["city"])
-    col3.metric("Gem. wind", f"{df['wind'].mean():.1f} km/h")
+    col3.metric("Gem. Wind", f"{df['wind'].mean():.1f} km/h")
 
+    # Wereldkaart
     fig_map = px.scatter_geo(
         df,
         lat="lat",
@@ -107,18 +100,53 @@ if module == "🌍 Wereldkaart":
         hover_name="city",
         projection="natural earth",
         color_continuous_scale="Turbo",
+        template="plotly_dark",
+        title="Live Wereldtemperaturen"
+    )
+    st.plotly_chart(fig_map, use_container_width=True)
+
+    # Extra grafieken
+    col1, col2 = st.columns(2)
+
+    with col1:
+        fig_rank = px.bar(
+            df.sort_values("temp",ascending=False),
+            x="city",
+            y="temp",
+            template="plotly_dark",
+            title="Temperatuur ranking"
+        )
+        st.plotly_chart(fig_rank, use_container_width=True)
+
+    with col2:
+        fig_wind = px.bar(
+            df.sort_values("wind",ascending=False),
+            x="city",
+            y="wind",
+            template="plotly_dark",
+            title="Wind ranking"
+        )
+        st.plotly_chart(fig_wind, use_container_width=True)
+
+    st.subheader("🌡️ Temperatuur vs Wind")
+
+    fig_scatter = px.scatter(
+        df,
+        x="temp",
+        y="wind",
+        text="city",
         template="plotly_dark"
     )
 
-    st.plotly_chart(fig_map, use_container_width=True)
+    st.plotly_chart(fig_scatter, use_container_width=True)
 
 # ======================================================
-# 📍 WEATHER FORECAST + VERGELIJKING
+# 📍 WEATHER FORECAST + VERGELIJKING + 1 STAD ANALYSE
 # ======================================================
 
 if module == "📍 Weather Forecast":
 
-    st.header("📍 7-daagse Forecast + Vergelijking")
+    st.header("📍 7-daagse Forecast")
 
     coords = {
         "Amsterdam": (52.37,4.90),
@@ -127,6 +155,12 @@ if module == "📍 Weather Forecast":
         "Tokyo": (35.68,139.69),
         "Sydney": (-33.86,151.21)
     }
+
+    # ---------------------------
+    # 1️⃣ VERGELIJKING 2 STEDEN
+    # ---------------------------
+
+    st.subheader("🔄 Vergelijk 2 steden")
 
     col1, col2 = st.columns(2)
     city1 = col1.selectbox("Stad 1", list(coords.keys()))
@@ -150,8 +184,41 @@ if module == "📍 Weather Forecast":
     fig_compare.add_trace(go.Scatter(x=df1["date"], y=df1["max_temp"], mode="lines+markers", name=f"{city1} Max"))
     fig_compare.add_trace(go.Scatter(x=df2["date"], y=df2["max_temp"], mode="lines+markers", name=f"{city2} Max"))
     fig_compare.update_layout(template="plotly_dark", title="Max temperatuur vergelijking")
-
     st.plotly_chart(fig_compare, use_container_width=True)
+
+    # ---------------------------
+    # 2️⃣ VOLLEDIGE ANALYSE 1 STAD
+    # ---------------------------
+
+    st.markdown("---")
+    st.subheader("📊 Diepgaande analyse van 1 stad")
+
+    single_city = st.selectbox("Kies stad voor volledige analyse", list(coords.keys()))
+
+    df_single = get_forecast(single_city)
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Gem. Max", f"{df_single['max_temp'].mean():.1f} °C")
+    col2.metric("Gem. Min", f"{df_single['min_temp'].mean():.1f} °C")
+    col3.metric("Totale regen", f"{df_single['rain'].sum():.1f} mm")
+
+    fig_temp = px.line(
+        df_single,
+        x="date",
+        y=["max_temp","min_temp"],
+        template="plotly_dark",
+        title=f"Temperatuurverloop - {single_city}"
+    )
+    st.plotly_chart(fig_temp, use_container_width=True)
+
+    fig_rain = px.bar(
+        df_single,
+        x="date",
+        y="rain",
+        template="plotly_dark",
+        title="Neerslag per dag"
+    )
+    st.plotly_chart(fig_rain, use_container_width=True)
 
 # ======================================================
 # 🔬 NL ENERGIE ONDERZOEK
