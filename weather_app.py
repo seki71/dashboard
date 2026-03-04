@@ -2,313 +2,260 @@ import streamlit as st
 import requests
 import pandas as pd
 import pydeck as pdk
+import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 
 st.set_page_config(layout="wide")
-st.title("🌍 Global Weather Dashboard")
 
-# =========================
-# Nederlandse + Internationale steden
-# =========================
-cities = {
+# ======================================================
+# 🎨 PREMIUM STYLING
+# ======================================================
 
-    # 🇳🇱 Nederland
-    "Amsterdam": (52.37, 4.90),
-    "Rotterdam": (51.92, 4.48),
-    "Den Haag": (52.08, 4.30),
-    "Utrecht": (52.09, 5.12),
-    "Eindhoven": (51.44, 5.48),
-    "Tilburg": (51.56, 5.09),
-    "Groningen": (53.22, 6.57),
-    "Almere": (52.35, 5.26),
-    "Breda": (51.59, 4.78),
-    "Nijmegen": (51.84, 5.86),
-    "Enschede": (52.22, 6.89),
-    "Haarlem": (52.38, 4.64),
-    "Arnhem": (51.98, 5.91),
-    "Zwolle": (52.51, 6.09),
-    "Leiden": (52.16, 4.49),
-    "Maastricht": (50.85, 5.69),
-    "Delft": (52.01, 4.36),
-    "Alkmaar": (52.63, 4.75),
-    "Gouda": (52.01, 4.71),
-    "Lelystad": (52.52, 5.47),
-
-    # 🌍 Europa
-    "London": (51.50, -0.12),
-    "Paris": (48.85, 2.35),
-    "Berlin": (52.52, 13.40),
-    "Madrid": (40.42, -3.70),
-    "Rome": (41.90, 12.49),
-    "Vienna": (48.20, 16.37),
-    "Prague": (50.08, 14.43),
-    "Stockholm": (59.33, 18.07),
-    "Warsaw": (52.23, 21.01),
-    "Lisbon": (38.72, -9.13),
-
-    # 🌎 Noord-Amerika
-    "New York": (40.71, -74.00),
-    "Los Angeles": (34.05, -118.24),
-    "Chicago": (41.88, -87.63),
-    "Toronto": (43.65, -79.38),
-    "Vancouver": (49.28, -123.12),
-    "Mexico City": (19.43, -99.13),
-
-    # 🌎 Zuid-Amerika
-    "Rio de Janeiro": (-22.90, -43.20),
-    "Buenos Aires": (-34.60, -58.38),
-    "Santiago": (-33.45, -70.66),
-
-    # 🌏 Azië
-    "Tokyo": (35.68, 139.69),
-    "Seoul": (37.56, 126.97),
-    "Beijing": (39.90, 116.40),
-    "Shanghai": (31.23, 121.47),
-    "Singapore": (1.29, 103.85),
-    "Mumbai": (19.07, 72.87),
-    "Dubai": (25.20, 55.27),
-
-    # 🌍 Afrika
-    "Cape Town": (-33.92, 18.42),
-    "Cairo": (30.04, 31.23),
-    "Nairobi": (-1.29, 36.82),
-    "Lagos": (6.52, 3.37),
-
-    # 🌏 Oceanië
-    "Sydney": (-33.86, 151.21),
-    "Melbourne": (-37.81, 144.96)
+st.markdown("""
+<style>
+.main { background-color: #0E1117; }
+[data-testid="stSidebar"] { background-color: #111827; }
+h1, h2, h3 { color: #F9FAFB; }
+[data-testid="metric-container"] {
+    background-color: #1F2937;
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid #374151;
 }
+.block-container { padding-top: 2rem; }
+</style>
+""", unsafe_allow_html=True)
 
-# =========================
-# CACHING (belangrijk!)
-# =========================
-@st.cache_data(ttl=600)
-def get_temperature_data():
-    data_points = []
+st.title("🌍 Global Weather & Energy Intelligence Dashboard")
 
-    for city, (lat, lon) in cities.items():
-        url = (
-            f"https://api.open-meteo.com/v1/forecast?"
-            f"latitude={lat}&longitude={lon}"
-            f"&current_weather=true"
-            f"&timezone=auto"
-        )
+# ======================================================
+# 🎛 SIDEBAR
+# ======================================================
+
+st.sidebar.markdown("## ⚙️ Controls")
+
+module = st.sidebar.radio(
+    "Module",
+    ["🌍 Wereldkaart", "📍 Stad Analyse", "🔬 NL Energie Onderzoek"]
+)
+
+selected_year = st.sidebar.selectbox(
+    "Jaar",
+    [2019, 2020, 2021, 2022, 2023]
+)
+
+if st.sidebar.button("🔄 Refresh Data"):
+    st.cache_data.clear()
+
+# ======================================================
+# 🌍 WERELDKAART (ANIMATED STYLE)
+# ======================================================
+
+if module == "🌍 Wereldkaart":
+
+    cities = {
+        "Amsterdam": (52.37,4.90),
+        "London": (51.50,-0.12),
+        "Paris": (48.85,2.35),
+        "Berlin": (52.52,13.40),
+        "New York": (40.71,-74.00),
+        "Toronto": (43.65,-79.38),
+        "Tokyo": (35.68,139.69),
+        "Sydney": (-33.86,151.21),
+        "Dubai": (25.20,55.27),
+        "Singapore": (1.29,103.85)
+    }
+
+    @st.cache_data(ttl=3600)
+    def get_world():
+        lats = ",".join([str(v[0]) for v in cities.values()])
+        lons = ",".join([str(v[1]) for v in cities.values()])
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={lats}&longitude={lons}&current_weather=true"
         response = requests.get(url).json()
-        temp = response["current_weather"]["temperature"]
 
-        data_points.append({
-            "city": city,
-            "lat": lat,
-            "lon": lon,
-            "temp": temp
-        })
+        data = []
+        for i, city in enumerate(cities.keys()):
+            data.append({
+                "city": city,
+                "lat": list(cities.values())[i][0],
+                "lon": list(cities.values())[i][1],
+                "temp": response[i]["current_weather"]["temperature"]
+            })
+        return pd.DataFrame(data)
 
-    return pd.DataFrame(data_points)
+    df = get_world()
 
-df = get_temperature_data()
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Aantal steden", len(df))
+    col2.metric("Gemiddelde temp", f"{df['temp'].mean():.1f}°C")
+    col3.metric("Max temp", f"{df['temp'].max():.1f}°C")
 
-# =========================
-# TEMPERATUUR KAART
-# =========================
-st.subheader("🌡️ Wereld Temperatuur Kaart")
-
-# Temperatuur normaliseren voor kleur
-min_temp = df["temp"].min()
-max_temp = df["temp"].max()
-
-def temp_to_color(temp):
-    ratio = (temp - min_temp) / (max_temp - min_temp + 1e-6)
-    red = int(255 * ratio)
-    blue = int(255 * (1 - ratio))
-    return [red, 0, blue, 200]
-
-df["color"] = df["temp"].apply(temp_to_color)
-
-view_state = pdk.ViewState(latitude=20, longitude=0, zoom=1.5)
-
-layer = pdk.Layer(
-    "ScatterplotLayer",
-    data=df,
-    get_position='[lon, lat]',
-    get_fill_color="color",
-    get_radius=200000,
-    pickable=True,
-)
-
-deck = pdk.Deck(
-    map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-    initial_view_state=view_state,
-    layers=[layer],
-    tooltip={"text": "{city}\nTemp: {temp}°C"}
-)
-
-st.pydeck_chart(deck)
-
-
-# =========================
-# Stad selectie
-# =========================
-st.subheader("📍 Stad Analyse")
-
-selected_city = st.selectbox("Kies een stad:", list(cities.keys()))
-lat, lon = cities[selected_city]
-
-weather_url = (
-    f"https://api.open-meteo.com/v1/forecast?"
-    f"latitude={lat}&longitude={lon}"
-    f"&current_weather=true"
-    f"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum"
-    f"&timezone=auto"
-)
-
-weather_data = requests.get(weather_url).json()
-
-col1, col2 = st.columns(2)
-col1.metric("Temperatuur (°C)", weather_data["current_weather"]["temperature"])
-col2.metric("Wind (km/h)", weather_data["current_weather"]["windspeed"])
-
-# =========================
-# Plotly Forecast
-# =========================
-st.subheader("📈 7-daagse Forecast")
-
-dates = weather_data["daily"]["time"]
-max_temp = weather_data["daily"]["temperature_2m_max"]
-min_temp = weather_data["daily"]["temperature_2m_min"]
-rain = weather_data["daily"]["precipitation_sum"]
-
-fig = go.Figure()
-
-fig.add_trace(go.Scatter(x=dates, y=max_temp, mode='lines+markers', name='Max Temp'))
-fig.add_trace(go.Scatter(x=dates, y=min_temp, mode='lines+markers', name='Min Temp'))
-fig.add_trace(go.Bar(x=dates, y=rain, name='Neerslag (mm)', yaxis='y2', opacity=0.4))
-
-fig.update_layout(
-    xaxis_title="Datum",
-    yaxis_title="Temperatuur (°C)",
-    yaxis2=dict(title="Neerslag (mm)", overlaying='y', side='right'),
-    hovermode="x unified"
-)
-
-st.plotly_chart(fig, use_container_width=True)
-
-# =====================================================
-# ONDERZOEK: MEERDERE JAREN TEMPERATUUR VS ENERGIE
-# =====================================================
-
-import numpy as np
-
-st.header("🔬 Onderzoek: Temperatuur vs Elektriciteitsverbruik (2019-2023)")
-
-years = [2019, 2020, 2021, 2022, 2023]
-
-# ---------------------------
-# Temperatuur ophalen per jaar
-# ---------------------------
-@st.cache_data(ttl=3600)
-def get_monthly_temperature(year):
-    url = (
-        "https://archive-api.open-meteo.com/v1/archive?"
-        "latitude=52.37&longitude=4.90"
-        f"&start_date={year}-01-01"
-        f"&end_date={year}-12-31"
-        "&daily=temperature_2m_mean"
-        "&timezone=auto"
+    # 🌍 Animated Scatter Map
+    fig_map = px.scatter_geo(
+        df,
+        lat="lat",
+        lon="lon",
+        color="temp",
+        size="temp",
+        hover_name="city",
+        color_continuous_scale="Turbo",
+        projection="natural earth"
     )
-    response = requests.get(url).json()
-    
-    df = pd.DataFrame({
-        "date": response["daily"]["time"],
-        "temp": response["daily"]["temperature_2m_mean"]
+
+    fig_map.update_layout(
+        template="plotly_dark",
+        title="Live Wereldtemperaturen",
+        transition_duration=800
+    )
+
+    st.plotly_chart(fig_map, use_container_width=True)
+
+# ======================================================
+# 📍 STAD ANALYSE (SMOOTH ANIMATED)
+# ======================================================
+
+if module == "📍 Stad Analyse":
+
+    city = st.selectbox("Selecteer stad", ["Amsterdam","London","New York","Tokyo","Sydney"])
+
+    coords = {
+        "Amsterdam": (52.37,4.90),
+        "London": (51.50,-0.12),
+        "New York": (40.71,-74.00),
+        "Tokyo": (35.68,139.69),
+        "Sydney": (-33.86,151.21)
+    }
+
+    lat, lon = coords[city]
+
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&daily=temperature_2m_max,temperature_2m_min&timezone=auto"
+    data = requests.get(url).json()
+
+    df_city = pd.DataFrame({
+        "date": data["daily"]["time"],
+        "max": data["daily"]["temperature_2m_max"],
+        "min": data["daily"]["temperature_2m_min"]
     })
-    
-    df["date"] = pd.to_datetime(df["date"])
-    df["month"] = df["date"].dt.month
-    
-    monthly_temp = df.groupby("month")["temp"].mean().reset_index()
-    monthly_temp["year"] = year
-    return monthly_temp
 
-# ---------------------------
-# Simulatie energieverbruik per jaar
-# (trend lichte stijging per jaar)
-# ---------------------------
-def get_energy_for_year(year):
-    base = np.array([
-        12000,11500,11000,10000,9500,9000,
-        9200,9400,9800,10500,11200,11800
-    ])
-    
-    growth = (year - 2019) * 200  # lichte stijging per jaar
-    energy = base + growth
-    
-    df = pd.DataFrame({
-        "month": list(range(1,13)),
-        "electricity": energy,
-        "year": year
-    })
-    return df
+    fig = px.line(
+        df_city,
+        x="date",
+        y=["max","min"],
+        template="plotly_dark",
+        title=f"7-daagse Forecast – {city}"
+    )
 
-# ---------------------------
-# Data verzamelen
-# ---------------------------
-all_data = []
+    fig.update_layout(transition_duration=800)
 
-for year in years:
-    temp_df = get_monthly_temperature(year)
-    energy_df = get_energy_for_year(year)
-    
-    merged = pd.merge(temp_df, energy_df, on=["month","year"])
-    all_data.append(merged)
+    st.plotly_chart(fig, use_container_width=True)
 
-full_df = pd.concat(all_data)
+# ======================================================
+# 🔬 NL ENERGIE ONDERZOEK (ANIMATED ANALYTICS)
+# ======================================================
 
-st.subheader("📊 Gecombineerde Data")
-st.dataframe(full_df.head())
+if module == "🔬 NL Energie Onderzoek":
 
-# ---------------------------
-# Jaar filter
-# ---------------------------
-selected_year = st.selectbox("Kies een jaar:", years)
+    st.header("🔬 Temperatuur vs Elektriciteitsverbruik NL")
 
-df_year = full_df[full_df["year"] == selected_year]
+    nl_cities = {
+        "Amsterdam": (52.37,4.90),
+        "Rotterdam": (51.92,4.48),
+        "Utrecht": (52.09,5.12),
+        "Groningen": (53.22,6.57),
+        "Eindhoven": (51.44,5.48),
+    }
 
-x = df_year["temp"]
-y = df_year["electricity"]
+    years = [2019,2020,2021,2022,2023]
 
-# Regressie berekenen
-slope, intercept = np.polyfit(x, y, 1)
-regression_line = slope * x + intercept
+    @st.cache_data(ttl=86400)
+    def get_temp():
+        lats = ",".join([str(v[0]) for v in nl_cities.values()])
+        lons = ",".join([str(v[1]) for v in nl_cities.values()])
+        url = f"https://archive-api.open-meteo.com/v1/archive?latitude={lats}&longitude={lons}&start_date=2019-01-01&end_date=2023-12-31&daily=temperature_2m_mean"
+        response = requests.get(url).json()
 
-r_squared = x.corr(y) ** 2
+        city_data = []
+        for i in range(len(nl_cities)):
+            df_temp = pd.DataFrame({
+                "date": response[i]["daily"]["time"],
+                "temp": response[i]["daily"]["temperature_2m_mean"]
+            })
+            df_temp["date"] = pd.to_datetime(df_temp["date"])
+            df_temp["year"] = df_temp["date"].dt.year
+            df_temp["month"] = df_temp["date"].dt.month
+            monthly = df_temp.groupby(["year","month"])["temp"].mean().reset_index()
+            city_data.append(monthly)
 
-# ---------------------------
-# Plot maken
-# ---------------------------
-fig = go.Figure()
+        combined = pd.concat(city_data)
+        national = combined.groupby(["year","month"])["temp"].mean().reset_index()
+        return national
 
-# Punten
-fig.add_trace(go.Scatter(
-    x=x,
-    y=y,
-    mode='markers',
-    marker=dict(size=10),
-    name=f"{selected_year} punten"
-))
+    @st.cache_data(ttl=86400)
+    def get_cbs():
+        url = "https://opendata.cbs.nl/ODataApi/odata/84575NED/TypedDataSet"
+        df = pd.DataFrame(requests.get(url).json()["value"])
+        df = df[df["Perioden"].str.contains("2019|2020|2021|2022|2023")]
+        df = df[df["Perioden"].str.contains("M")]
+        df_energy = df[["Perioden","NettoVerbruikBerekend_30"]]
+        df_energy.columns = ["period","electricity"]
+        df_energy["year"] = df_energy["period"].str[:4].astype(int)
+        df_energy["month"] = df_energy["period"].str.extract(r"M(\d+)").astype(int)
+        return df_energy[["year","month","electricity"]]
 
-# Regressielijn
-fig.add_trace(go.Scatter(
-    x=x,
-    y=regression_line,
-    mode='lines',
-    name=f"Regressielijn (R²={r_squared:.2f})"
-))
+    with st.spinner("Data laden..."):
+        temp_df = get_temp()
+        energy_df = get_cbs()
 
-fig.update_layout(
-    title=f"Temperatuur vs Elektriciteitsverbruik ({selected_year})",
-    xaxis_title="Gemiddelde Maandtemperatuur (°C)",
-    yaxis_title="Elektriciteitsverbruik (GWh)",
-)
+    merged = pd.merge(temp_df, energy_df, on=["year","month"])
+    df_year = merged[merged["year"]==selected_year]
 
-st.plotly_chart(fig, use_container_width=True)
+    x = df_year["temp"]
+    y = df_year["electricity"]
+
+    slope, intercept = np.polyfit(x,y,1)
+    regression_line = slope*x + intercept
+    r2 = x.corr(y)**2
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Gemiddelde Temp", f"{x.mean():.2f}°C")
+    col2.metric("Gemiddeld Verbruik", f"{y.mean():,.0f}")
+    col3.metric("R²", f"{r2:.3f}")
+
+    fig_reg = go.Figure()
+    fig_reg.add_trace(go.Scatter(x=x,y=y,mode="markers",name="Maanden"))
+    fig_reg.add_trace(go.Scatter(x=x,y=regression_line,mode="lines",name="Regressie"))
+
+    fig_reg.update_layout(
+        template="plotly_dark",
+        title=f"Regressie Analyse ({selected_year})",
+        xaxis_title="Gemiddelde maandtemperatuur (°C)",
+        yaxis_title="Elektriciteitsverbruik",
+        transition_duration=800
+    )
+
+    st.plotly_chart(fig_reg, use_container_width=True)
+
+    # Animated Trend
+    fig_trend = px.line(
+        merged,
+        x="month",
+        y="electricity",
+        color="year",
+        template="plotly_dark",
+        title="Trend Elektriciteitsverbruik 2019-2023"
+    )
+
+    fig_trend.update_layout(transition_duration=800)
+
+    st.plotly_chart(fig_trend, use_container_width=True)
+
+    st.subheader("🧠 Automatische Conclusie")
+
+    direction = "negatieve" if slope < 0 else "positieve"
+
+    st.write(f"""
+Er is een **{direction} relatie** tussen temperatuur en elektriciteitsverbruik.
+R² = **{r2:.2f}**, wat betekent dat ongeveer **{r2*100:.1f}%**
+van de variatie verklaard wordt door temperatuur.
+""")
