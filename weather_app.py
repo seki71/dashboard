@@ -5,7 +5,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 
-
 st.set_page_config(layout="wide")
 
 # ======================================================
@@ -56,19 +55,72 @@ if module == "🌍 Wereldkaart":
     cities = {
         "Amsterdam": (52.37,4.90,"Europe"),
         "Rotterdam": (51.92,4.48,"Europe"),
+        "Utrecht": (52.09,5.12,"Europe"),
+        "Eindhoven": (51.44,5.48,"Europe"),
+        "Groningen": (53.22,6.57,"Europe"),
+
         "London": (51.50,-0.12,"Europe"),
         "Paris": (48.85,2.35,"Europe"),
         "Berlin": (52.52,13.40,"Europe"),
         "Madrid": (40.42,-3.70,"Europe"),
+        "Rome": (41.90,12.49,"Europe"),
+        "Vienna": (48.20,16.37,"Europe"),
+        "Prague": (50.08,14.43,"Europe"),
+        "Warsaw": (52.23,21.01,"Europe"),
+        "Stockholm": (59.33,18.07,"Europe"),
+        "Oslo": (59.91,10.75,"Europe"),
+        "Copenhagen": (55.68,12.57,"Europe"),
+        "Helsinki": (60.17,24.94,"Europe"),
+        "Lisbon": (38.72,-9.13,"Europe"),
+        "Athens": (37.98,23.72,"Europe"),
+        "Budapest": (47.49,19.04,"Europe"),
+        "Dublin": (53.35,-6.26,"Europe"),
+        "Brussels": (50.85,4.35,"Europe"),
+
         "New York": (40.71,-74.00,"North America"),
         "Los Angeles": (34.05,-118.24,"North America"),
+        "Chicago": (41.88,-87.63,"North America"),
+        "Houston": (29.76,-95.37,"North America"),
+        "Miami": (25.76,-80.19,"North America"),
         "Toronto": (43.65,-79.38,"North America"),
+        "Vancouver": (49.28,-123.12,"North America"),
+        "Montreal": (45.50,-73.56,"North America"),
+        "Mexico City": (19.43,-99.13,"North America"),
+
         "Rio de Janeiro": (-22.90,-43.20,"South America"),
+        "Buenos Aires": (-34.60,-58.38,"South America"),
+        "Santiago": (-33.45,-70.66,"South America"),
+        "Lima": (-12.05,-77.04,"South America"),
+        "Bogotá": (4.71,-74.07,"South America"),
+        "São Paulo": (-23.55,-46.63,"South America"),
+
         "Tokyo": (35.68,139.69,"Asia"),
+        "Seoul": (37.56,126.97,"Asia"),
+        "Beijing": (39.90,116.40,"Asia"),
+        "Shanghai": (31.23,121.47,"Asia"),
         "Singapore": (1.29,103.85,"Asia"),
         "Dubai": (25.20,55.27,"Asia"),
+        "Mumbai": (19.07,72.87,"Asia"),
+        "Bangkok": (13.75,100.50,"Asia"),
+        "Jakarta": (-6.21,106.85,"Asia"),
+        "Manila": (14.60,120.98,"Asia"),
+        "Hong Kong": (22.32,114.17,"Asia"),
+        "Kuala Lumpur": (3.14,101.69,"Asia"),
+        "Delhi": (28.61,77.20,"Asia"),
+
+        "Cape Town": (-33.92,18.42,"Africa"),
+        "Cairo": (30.04,31.23,"Africa"),
+        "Nairobi": (-1.29,36.82,"Africa"),
+        "Lagos": (6.52,3.37,"Africa"),
+        "Johannesburg": (-26.20,28.04,"Africa"),
+        "Casablanca": (33.57,-7.59,"Africa"),
+        "Accra": (5.56,-0.20,"Africa"),
+
         "Sydney": (-33.86,151.21,"Oceania"),
-        "Cape Town": (-33.92,18.42,"Africa")
+        "Melbourne": (-37.81,144.96,"Oceania"),
+        "Auckland": (-36.85,174.76,"Oceania"),
+        "Brisbane": (-27.47,153.03,"Oceania"),
+        "Perth": (-31.95,115.86,"Oceania")
     }
 
     @st.cache_data(ttl=3600)
@@ -92,16 +144,13 @@ if module == "🌍 Wereldkaart":
 
     df = get_world()
 
-    # KPI
     col1, col2, col3 = st.columns(3)
     col1.metric("Gem. Temp", f"{df['temp'].mean():.1f} °C")
     col2.metric("Warmste stad", df.sort_values("temp",ascending=False).iloc[0]["city"])
     col3.metric("Gem. Wind", f"{df['wind'].mean():.1f} km/h")
 
-    # Fix negatieve size
     df["size_temp"] = df["temp"].abs() + 5
 
-    # Wereldkaart
     fig_map = px.scatter_geo(
         df,
         lat="lat",
@@ -116,28 +165,61 @@ if module == "🌍 Wereldkaart":
     )
     st.plotly_chart(fig_map, use_container_width=True)
 
-    # Extra grafieken
+    # =========================
+    # OVERZICHTELIJKE GRAFIEKEN
+    # =========================
+
+    st.markdown("---")
+
     col1, col2 = st.columns(2)
 
     with col1:
+        top10_temp = df.sort_values("temp", ascending=False).head(10)
         fig_rank = px.bar(
-            df.sort_values("temp",ascending=False),
-            x="city",
-            y="temp",
+            top10_temp,
+            x="temp",
+            y="city",
+            orientation="h",
             template="plotly_dark",
-            title="Temperatuur ranking"
+            title="🔥 Top 10 Warmste Steden"
         )
+        fig_rank.update_layout(yaxis=dict(autorange="reversed"))
         st.plotly_chart(fig_rank, use_container_width=True)
 
     with col2:
+        top10_wind = df.sort_values("wind", ascending=False).head(10)
         fig_wind = px.bar(
-            df.sort_values("wind",ascending=False),
-            x="city",
-            y="wind",
+            top10_wind,
+            x="wind",
+            y="city",
+            orientation="h",
             template="plotly_dark",
-            title="Wind ranking"
+            title="🌬️ Top 10 Winderigste Steden"
         )
+        fig_wind.update_layout(yaxis=dict(autorange="reversed"))
         st.plotly_chart(fig_wind, use_container_width=True)
+
+    st.subheader("🌍 Gemiddelde Temperatuur per Continent")
+
+    continent_avg = df.groupby("continent")["temp"].mean().reset_index()
+    fig_cont = px.bar(
+        continent_avg,
+        x="continent",
+        y="temp",
+        color="continent",
+        template="plotly_dark"
+    )
+    st.plotly_chart(fig_cont, use_container_width=True)
+
+    st.subheader("📊 Temperatuurverdeling")
+
+    fig_hist = px.histogram(
+        df,
+        x="temp",
+        nbins=15,
+        template="plotly_dark"
+    )
+    st.plotly_chart(fig_hist, use_container_width=True)
 # ======================================================
 # 📍 WEATHER FORECAST + VERGELIJKING + 1 STAD ANALYSE
 # ======================================================
