@@ -220,6 +220,7 @@ if module == "🌍 Wereldkaart":
         template="plotly_dark"
     )
     st.plotly_chart(fig_hist, use_container_width=True)
+
 # ======================================================
 # 📍 WEATHER FORECAST + VERGELIJKING + 1 STAD ANALYSE
 # ======================================================
@@ -230,10 +231,73 @@ if module == "📍 Weather Forecast":
 
     coords = {
         "Amsterdam": (52.37,4.90),
+        "Rotterdam": (51.92,4.48),
+        "Utrecht": (52.09,5.12),
+        "Eindhoven": (51.44,5.48),
+        "Groningen": (53.22,6.57),
+
         "London": (51.50,-0.12),
+        "Paris": (48.85,2.35),
+        "Berlin": (52.52,13.40),
+        "Madrid": (40.42,-3.70),
+        "Rome": (41.90,12.49),
+        "Vienna": (48.20,16.37),
+        "Prague": (50.08,14.43),
+        "Warsaw": (52.23,21.01),
+        "Stockholm": (59.33,18.07),
+        "Oslo": (59.91,10.75),
+        "Copenhagen": (55.68,12.57),
+        "Helsinki": (60.17,24.94),
+        "Lisbon": (38.72,-9.13),
+        "Athens": (37.98,23.72),
+        "Budapest": (47.49,19.04),
+        "Dublin": (53.35,-6.26),
+        "Brussels": (50.85,4.35),
+
         "New York": (40.71,-74.00),
+        "Los Angeles": (34.05,-118.24),
+        "Chicago": (41.88,-87.63),
+        "Houston": (29.76,-95.37),
+        "Miami": (25.76,-80.19),
+        "Toronto": (43.65,-79.38),
+        "Vancouver": (49.28,-123.12),
+        "Montreal": (45.50,-73.56),
+        "Mexico City": (19.43,-99.13),
+
+        "Rio de Janeiro": (-22.90,-43.20),
+        "Buenos Aires": (-34.60,-58.38),
+        "Santiago": (-33.45,-70.66),
+        "Lima": (-12.05,-77.04),
+        "Bogotá": (4.71,-74.07),
+        "São Paulo": (-23.55,-46.63),
+
         "Tokyo": (35.68,139.69),
-        "Sydney": (-33.86,151.21)
+        "Seoul": (37.56,126.97),
+        "Beijing": (39.90,116.40),
+        "Shanghai": (31.23,121.47),
+        "Singapore": (1.29,103.85),
+        "Dubai": (25.20,55.27),
+        "Mumbai": (19.07,72.87),
+        "Bangkok": (13.75,100.50),
+        "Jakarta": (-6.21,106.85),
+        "Manila": (14.60,120.98),
+        "Hong Kong": (22.32,114.17),
+        "Kuala Lumpur": (3.14,101.69),
+        "Delhi": (28.61,77.20),
+
+        "Cape Town": (-33.92,18.42),
+        "Cairo": (30.04,31.23),
+        "Nairobi": (-1.29,36.82),
+        "Lagos": (6.52,3.37),
+        "Johannesburg": (-26.20,28.04),
+        "Casablanca": (33.57,-7.59),
+        "Accra": (5.56,-0.20),
+
+        "Sydney": (-33.86,151.21),
+        "Melbourne": (-37.81,144.96),
+        "Auckland": (-36.85,174.76),
+        "Brisbane": (-27.47,153.03),
+        "Perth": (-31.95,115.86)
     }
 
     # ---------------------------
